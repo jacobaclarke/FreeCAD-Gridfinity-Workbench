@@ -8,6 +8,7 @@ import Part
 
 from . import const, utils
 from . import label_shelf as label_shelf_module
+from .utils import unitmm
 
 unitmm = fc.Units.Quantity("1 mm")
 zeromm = fc.Units.Quantity("0 mm")
@@ -617,12 +618,28 @@ def make_bottom_hole_shape(obj: fc.DocumentObject) -> Part.Shape:
         )
 
     if obj.ScrewHoles:
+        # Create the main screw hole
         screw_hole_shape = Part.makeCylinder(
             obj.ScrewHoleDiameter / 2,
             obj.ScrewHoleDepth,
             fc.Vector(0, 0, 0),
             fc.Vector(0, 0, 1),
         )
+
+        # Create the chamfer for heat set inserts at the bottom
+        if obj.ScrewHoleChamfer > 0:
+            chamfer_top = Part.makeCircle(
+                obj.ScrewHoleDiameter / 2 + obj.ScrewHoleChamfer,
+                fc.Vector(0, 0, 0),
+                fc.Vector(0, 0, 1),
+            )
+            chamfer_bottom = Part.makeCircle(
+                obj.ScrewHoleDiameter / 2,
+                fc.Vector(0, 0, obj.ScrewHoleChamfer),
+                fc.Vector(0, 0, 1),
+            )
+            chamfer = Part.makeLoft([chamfer_top, chamfer_bottom], solid=True)
+            screw_hole_shape = screw_hole_shape.fuse(chamfer)
 
         bottom_hole_shape = (
             screw_hole_shape
@@ -1206,7 +1223,7 @@ def bin_bottom_holes_properties(obj: fc.DocumentObject, *, magnet_holes_default:
         "GridfinityNonStandard",
         "Diameter of Screw Holes, used to put screws in bin to secure in place"
         "<br> <br> default = 3.0 mm",
-    ).ScrewHoleDiameter = const.SCREW_HOLE_DIAMETER
+    ).ScrewHoleDiameter = const.BIN_SCREW_HOLE_DIAMETER
 
     obj.addProperty(
         "App::PropertyLength",
@@ -1214,6 +1231,13 @@ def bin_bottom_holes_properties(obj: fc.DocumentObject, *, magnet_holes_default:
         "GridfinityNonStandard",
         "Depth of Screw Holes <br> <br> default = 6.0 mm",
     ).ScrewHoleDepth = const.SCREW_HOLE_DEPTH
+
+    obj.addProperty(
+        "App::PropertyLength",
+        "ScrewHoleChamfer",
+        "GridfinityNonStandard",
+        "Chamfer at bottom of screw holes for heat set inserts <br> <br> default = 0.4 mm",
+    ).ScrewHoleChamfer = 0.4 * unitmm
 
     ## Expert Only Parameters
     obj.addProperty(

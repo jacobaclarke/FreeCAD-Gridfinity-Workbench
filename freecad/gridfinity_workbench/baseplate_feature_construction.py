@@ -249,43 +249,81 @@ def screw_bottom_chamfer_properties(obj: fc.DocumentObject) -> None:
         "Diameter of screw holes inside magnet holes <br> <br> default = 3 mm",
     ).ScrewHoleDiameter = const.SCREW_HOLE_DIAMETER
 
-    ## Gridfinity Expert Only Parameters
+    obj.addProperty(
+        "App::PropertyEnumeration",
+        "MagnetBottomStyle",
+        "NonStandard", 
+        "Style of bottom hole features for screws"
+        "<br>Chamfer: Countersunk screws"
+        "<br>Counterbore: Socket head cap screws"
+        "<br><br>default = Chamfer",
+    ).MagnetBottomStyle = ["Counterbore", "Chamfer"]
+
+
     obj.addProperty(
         "App::PropertyLength",
-        "MagnetBottomChamfer",
+        "MagnetBottomCounterboreDepth",
         "zzExpertOnly",
-        "Chamfer of screwholes on the bottom of the baseplate, allows the use of countersuck"
-        "m3 screws in the bottom up to a bin <br> <br> default = 3 mm",
-    ).MagnetBottomChamfer = const.MAGNET_BOTTOM_CHAMFER
+        "Counterbore depth for screw heads on bottom of baseplate, allows screws to sit flush"
+        " <br> <br> default = 0 mm",
+    ).MagnetBottomCounterboreDepth = const.MAGNET_BOTTOM_COUNTERBORE
+
+    obj.addProperty(
+        "App::PropertyLength", 
+        "MagnetBottomScrewHeadDiameter",
+        "zzExpertOnly",
+        "Diameter of screw head for counterbore <br> <br> default = 6 mm",
+    ).MagnetBottomScrewHeadDiameter = const.SCREW_HEAD_DIAMETER
 
 
-def make_screw_bottom_chamfer(obj: fc.DocumentObject, layout: GridfinityLayout) -> Part.Shape:
-    """Create screw chamfer for a baseplate."""
+def make_screw_bottom_features(obj: fc.DocumentObject, layout: GridfinityLayout) -> Part.Shape:
+    """Create bottom features (chamfer or counterbore) for magnet holes in a baseplate."""
     x_hole_pos = obj.xGridSize / 2 - obj.MagnetHoleDistanceFromEdge
     y_hole_pos = obj.yGridSize / 2 - obj.MagnetHoleDistanceFromEdge
 
-    ct_z = -obj.TotalHeight + obj.BaseProfileHeight
-    ct = [
-        Part.makeCircle(
-            obj.ScrewHoleDiameter / 2 + obj.MagnetBottomChamfer,
-            pos,
-            fc.Vector(0, 0, 1),
-        )
-        for pos in utils.corners(x_hole_pos, y_hole_pos, ct_z)
-    ]
-    cb_z = -obj.TotalHeight + obj.MagnetBottomChamfer + obj.BaseProfileHeight
-    cb = [
-        Part.makeCircle(
-            obj.ScrewHoleDiameter / 2,
-            pos,
-            fc.Vector(0, 0, 1),
-        )
-        for pos in utils.corners(x_hole_pos, y_hole_pos, cb_z)
-    ]
+    # Base position for bottom features
+    base_z = -obj.TotalHeight + obj.BaseProfileHeight
 
-    ch = [Part.makeLoft([t, b], solid=True) for t, b in zip(ct, cb)]
+    if obj.MagnetBottomStyle == "Counterbore":
+        # Create counterbore
+        cb_top = [
+            Part.makeCircle(
+                obj.MagnetBottomScrewHeadDiameter / 2,
+                pos,
+                fc.Vector(0, 0, 1),
+            )
+            for pos in utils.corners(x_hole_pos, y_hole_pos, base_z +  obj.MagnetBottomCounterboreDepth)
+        ]
+        cb_bottom = [
+            Part.makeCircle(
+                obj.ScrewHoleDiameter / 2,
+                pos,
+                fc.Vector(0, 0, 1),
+            )
+            for pos in utils.corners(x_hole_pos, y_hole_pos, base_z - obj.MagnetBottomScrewHeadDiameter)
+        ]
+        features = [Part.makeLoft([t, b], solid=True) for t, b in zip(cb_top, cb_bottom)]
+    else:
+        # Create chamfer
+        ct = [
+            Part.makeCircle(
+                obj.ScrewHoleDiameter / 2 + obj.MagnetBottomScrewHeadDiameter / 2,
+                pos,
+                fc.Vector(0, 0, 1),
+            )
+            for pos in utils.corners(x_hole_pos, y_hole_pos, base_z)
+        ]
+        cb = [
+            Part.makeCircle(
+                obj.ScrewHoleDiameter / 2,
+                pos,
+                fc.Vector(0, 0, 1),
+            )
+            for pos in utils.corners(x_hole_pos, y_hole_pos, base_z - obj.MagnetBottomScrewHeadDiameter / 2)
+        ]
+        features = [Part.makeLoft([t, b], solid=True) for t, b in zip(ct, cb)]
 
-    hm1 = utils.multi_fuse(ch)
+    hm1 = utils.multi_fuse(features)
     hm2 = utils.copy_in_layout(hm1, layout, obj.xGridSize, obj.yGridSize)
     return hm2.translate(
         fc.Vector(obj.xGridSize / 2 - obj.xLocationOffset, obj.yGridSize / 2 - obj.yLocationOffset),
