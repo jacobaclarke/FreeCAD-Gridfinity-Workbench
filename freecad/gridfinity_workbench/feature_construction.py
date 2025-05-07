@@ -1253,19 +1253,38 @@ def make_bin_bottom_holes(
     obj: fc.DocumentObject,
     layout: GridfinityLayout,
 ) -> Part.Shape:
-    """Make bin bottom holes."""
+    """Make bin bottom holes at outer corners only."""
     bottom_hole_shape = make_bottom_hole_shape(obj)
 
-    x_hole_pos = obj.xGridSize / 2 - obj.MagnetHoleDistanceFromEdge
-    y_hole_pos = obj.yGridSize / 2 - obj.MagnetHoleDistanceFromEdge
 
-    hole_shape_sub_array = utils.copy_and_translate(
-        bottom_hole_shape,
-        utils.corners(x_hole_pos, y_hole_pos, -obj.TotalHeight),
-    )
+    # Get the outer corners of the layout
+    outer_corners = [
+        (0, 0, obj.MagnetHoleDistanceFromEdge, obj.MagnetHoleDistanceFromEdge),  # Bottom left
+        (len(layout) - 1, 0, obj.xGridSize - obj.MagnetHoleDistanceFromEdge, obj.MagnetHoleDistanceFromEdge),  # Bottom right
+        (0, len(layout[0]) - 1, obj.MagnetHoleDistanceFromEdge, obj.yGridSize - obj.MagnetHoleDistanceFromEdge),  # Top left
+        (len(layout) - 1, len(layout[0]) - 1, obj.xGridSize - obj.MagnetHoleDistanceFromEdge, obj.yGridSize - obj.MagnetHoleDistanceFromEdge),  # Top right
+    ]
 
-    fuse_total = utils.copy_in_layout(hole_shape_sub_array, layout, obj.xGridSize, obj.yGridSize)
-    fuse_total.translate(fc.Vector(obj.xGridSize / 2, obj.yGridSize / 2))
+    # Create holes only at outer corners
+    holes = []
+    for x_idx, y_idx, x_offset, y_offset in outer_corners:
+
+        
+
+
+        # Calculate position based on grid size and hole offset
+        pos = fc.Vector(
+            x_idx * obj.xGridSize + x_offset,
+            y_idx * obj.yGridSize + y_offset,
+            -obj.TotalHeight
+        )
+        hole = bottom_hole_shape.copy()
+        hole.translate(pos)
+        holes.append(hole)
+
+    # Combine all holes
+    fuse_total = utils.multi_fuse(holes)
+    # Apply the location offset
     return fuse_total.translate(fc.Vector(-obj.xLocationOffset, -obj.yLocationOffset))
 
 

@@ -213,6 +213,8 @@ def make_magnet_holes(obj: fc.DocumentObject, layout: GridfinityLayout) -> Part.
         hm1 = _magnet_hole_hex(obj, x_hole_pos, y_hole_pos)
     elif obj.MagnetHolesShape == "Round":
         hm1 = _magnet_hole_round(obj, x_hole_pos, y_hole_pos)
+    elif obj.MagnetHolesShape == "None":
+        None
     else:
         raise ValueError(f"Unexpected hole shape: {obj.MagnetHolesShape}")
 
@@ -227,7 +229,10 @@ def make_magnet_holes(obj: fc.DocumentObject, layout: GridfinityLayout) -> Part.
         for pos in utils.corners(x_hole_pos, -y_hole_pos)
     ]
 
-    hm1 = hm1.multiFuse(ca)
+    if obj.MagnetHolesShape == "None":
+        hm1 = utils.multi_fuse(ca)
+    else:
+        hm1 = hm1.multiFuse(ca)
     hm1.translate(fc.Vector(obj.xGridSize / 2, obj.yGridSize / 2))
 
     hm2 = utils.copy_in_layout(hm1, layout, obj.xGridSize, obj.yGridSize)
